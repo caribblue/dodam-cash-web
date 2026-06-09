@@ -13,9 +13,10 @@ export default function Home() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   
-  const [view, setView] = useState('transaction'); // transaction, dashboard, income, settings
+  const [view, setView] = useState('transaction'); // transaction, dashboard, income, balance, settings
   const [ledgers, setLedgers] = useState([]);
   const [currentEditId, setCurrentEditId] = useState(null);
+  const [selectedAccountDetail, setSelectedAccountDetail] = useState(null); // 잔액 검증용 상세 보기 계정
 
   // 계정과목 기본 데이터
   const [customAccounts, setCustomAccounts] = useState({
@@ -145,11 +146,12 @@ export default function Home() {
     setTransCredit(target.credit);
     setTransMemo(target.memo || '');
     setCurrentEditId(id);
+    setView('transaction');
   };
 
   const deleteTransaction = (id) => {
     if (confirm("이 거래 내역을 삭제하시겠습니까?")) {
-      const updated = ledgers.filter(t => t.id !== id);
+      const updated = ledgers.filter(t !== id);
       setLedgers(updated);
       saveToDB(updated);
     }
@@ -158,11 +160,11 @@ export default function Home() {
   // --- 계정과목 카테고리 판별 ---
   const getAccountCategory = (accountName) => {
     if (!accountName) return 'unknown';
-    if (customAccounts.asset.some(acc => accountName.includes(acc))) return 'asset';
-    if (customAccounts.liability.some(acc => accountName.includes(acc))) return 'liability';
-    if (customAccounts.equity.some(acc => accountName.includes(acc))) return 'equity';
-    if (customAccounts.revenue.some(acc => accountName.includes(acc))) return 'revenue';
-    if (customAccounts.expense.some(acc => accountName.includes(acc))) return 'expense';
+    if (customAccounts.asset.some(acc => accountName === acc)) return 'asset';
+    if (customAccounts.liability.some(acc => accountName === acc)) return 'liability';
+    if (customAccounts.equity.some(acc => accountName === acc)) return 'equity';
+    if (customAccounts.revenue.some(acc => accountName === acc)) return 'revenue';
+    if (customAccounts.expense.some(acc => accountName === acc)) return 'expense';
     return 'unknown';
   };
 
@@ -306,7 +308,34 @@ export default function Home() {
     reader.readAsArrayBuffer(file);
   };
 
-  // --- 대시보드 & 손익 계산 로직 ---
+  // --- 실시간 자산/부채/자본/수익/비용 잔액 계산기 (누적 계산) ---
+  const accountBalances = {};
+  allAccounts.forEach(acc => { accountBalances[acc] = 0; });
+
+  ledgers.forEach(t => {
+    const debitCategory = getAccountCategory(t.debit);
+    const creditCategory = getAccountCategory(t.credit);
+
+    // 차변(왼쪽) 정산: 자산 증가(+), 비용 증가(+), 부채 감소(-), 자본 감소(-), 수익 감소(-)
+    if (t.debit in accountBalances) {
+      if (debitCategory === 'asset' || debitCategory === 'expense') {
+        accountBalances[t.debit] += t.amount;
+      } else {
+        accountBalances[t.debit] -= t.amount;
+      }
+    }
+
+    // 대변(오른쪽) 정산: 부채 증가(+), 자본 증가(+), 수익 증가(+), 자산 감소(-), 비용 감소(-)
+    if (t.credit in accountBalances) {
+      if (creditCategory === 'liability' || creditCategory === 'equity' || creditCategory === 'revenue') {
+        accountBalances[t.credit] += t.amount;
+      } else {
+        accountBalances[t.credit] -= t.amount;
+      }
+    }
+  });
+
+  // 기간 필터 적용 대시보드 변수
   let totalRevenue = 0, totalExpense = 0, totalAsset = 0, totalLiability = 0;
   const expBreakdown = {};
   const revBreakdown = {};
@@ -343,6 +372,13 @@ export default function Home() {
   const sortedExpenses = Object.entries(expBreakdown).sort((a, b) => b[1] - a[1]);
   const sortedRevenues = Object.entries(revBreakdown).sort((a, b) => b[1] - a[1]);
 
+  // 특정 계정의 히스토리 내역 필터링 (잔액 아다리 검증용)
+  const getAccountHistory = (accName) => {
+    return ledgers
+      .filter(t => t.debit === accName || t.credit === accName)
+      .sort((a, b) => new Date(a.date) - new Date(b.date)); // 날짜 오름차순 정렬
+  };
+
   if (loading) {
     return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#f4f7fa', fontSize: '16px', fontWeight: '600' }}>도담캐시 불러오는 중...</div>;
   }
@@ -367,7 +403,7 @@ export default function Home() {
         <div className={`sidebar-item ${view === 'transaction' ? 'active' : ''}`} onClick={() => setView('transaction')}>📒 거래입력</div>
         <div className={`sidebar-item ${view === 'dashboard' ? 'active' : ''}`} onClick={() => setView('dashboard')}>📊 대시보드</div>
         <div className={`sidebar-item ${view === 'income' ? 'active' : ''}`} onClick={() => setView('income')}>📈 비용/수익</div>
-        <div className="sidebar-item" onClick={() => alert('준비 중입니다!')}>💰 자산/부채</div>
+        <div className={`sidebar-item ${view === 'balance' ? 'active' : ''}`} onClick={() => { setView('balance'); setSelectedAccountDetail(null); }}>💰 자산/부채</div>
         <div className={`sidebar-item ${view === 'settings' ? 'active' : ''}`} onClick={() => setView('settings')}>⚙️ 환경설정</div>
       </nav>
 
@@ -532,6 +568,110 @@ export default function Home() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {view === 'balance' && (
+          <div style={{ display: 'flex', flexDirection: 'row', gap: '24px', flex: 1, overflow: 'hidden' }}>
+            {/* 왼쪽: 항목별 현재 잔액 카드 목록 */}
+            <div style={{ flex: selectedAccountDetail ? 1 : 2, display: 'flex', flexDirection: 'column', gap: '20px', overflowY: 'auto', paddingRight: '10px' }}>
+              <h3 style={{ margin: 0, color: '#0f172a' }}>💰 계정별 현재 잔액 (아다리 검증)</h3>
+              <p style={{ fontSize: '13px', color: '#64748b', marginTop: '-10px' }}>항목을 클릭하면 해당 항목이 사용된 모든 복식부기 상세 이력(추적)을 확인할 수 있습니다.</p>
+              
+              {['asset', 'liability', 'equity'].map(category => (
+                <div key={category} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '20px' }}>
+                  <div style={{ fontWeight: '700', fontSize: '15px', color: '#1e293b', paddingBottom: '10px', borderBottom: '2px solid #f1f5f9', marginBottom: '12px' }}>
+                    {category === 'asset' ? '🟢 자산 항목 (통장, 미수금 등)' : category === 'liability' ? '🔴 부채 항목 (카드대금, 대출 등)' : '🔵 순자산/자본 항목'}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
+                    {customAccounts[category].map(accName => {
+                      const bal = accountBalances[accName] || 0;
+                      return (
+                        <div 
+                          key={accName} 
+                          onClick={() => setSelectedAccountDetail(accName)}
+                          style={{ 
+                            padding: '14px', 
+                            background: selectedAccountDetail === accName ? '#e0e4ff' : '#f8fafc', 
+                            border: selectedAccountDetail === accName ? '1px solid #545ceb' : '1px solid #e2e8f0',
+                            borderRadius: '10px', 
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px',
+                            transition: '0.2s'
+                          }}
+                        >
+                          <span style={{ fontSize: '13px', fontWeight: '500', color: '#64748b' }}>{accName}</span>
+                          <span style={{ fontSize: '16px', fontWeight: '700', color: bal < 0 ? '#ef4444' : '#0f172a' }}>
+                            ₩ {bal.toLocaleString()}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* 오른쪽: 클릭 시 나타나는 해당 항목 계정별 원장 및 검증 이력 */}
+            {selectedAccountDetail && (
+              <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column', border: '1px solid #e2e8f0', borderRadius: '16px', background: '#fff', overflow: 'hidden' }}>
+                <div style={{ padding: '16px 20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '500' }}>계정 상세 추적</span>
+                    <h4 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#0f172a' }}>🔍 {selectedAccountDetail} 내역</h4>
+                  </div>
+                  <button onClick={() => setSelectedAccountDetail(null)} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: '#94a3b8' }}>✕</button>
+                </div>
+                
+                <div style={{ padding: '14px 20px', background: '#e0e4ff', fontSize: '14px', fontWeight: '600', color: '#545ceb', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>최종 정산 잔액</span>
+                  <span>₩ {(accountBalances[selectedAccountDetail] || 0).toLocaleString()}</span>
+                </div>
+
+                <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
+                  <table style={{ fontSize: '13px' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ padding: '10px' }}>날짜</th>
+                        <th style={{ padding: '10px' }}>아이템</th>
+                        <th style={{ padding: '10px', textAlign: 'right' }}>금액</th>
+                        <th style={{ padding: '10px', textAlign: 'center' }}>구분</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {getAccountHistory(selectedAccountDetail).map(t => {
+                        const isDebit = t.debit === selectedAccountDetail;
+                        const cat = getAccountCategory(selectedAccountDetail);
+                        
+                        // 증가/감소 방향 가시화 규칙
+                        let flowType = '';
+                        if (cat === 'asset' || cat === 'expense') {
+                          flowType = isDebit ? '➕ 증가(차변)' : '➖ 감소(대변)';
+                        } else {
+                          flowType = isDebit ? '➖ 감소(차변)' : '➕ 증가(대변)';
+                        }
+
+                        return (
+                          <tr key={t.id} style={{ cursor: 'pointer' }} title="클릭 시 수정모드로 전환" onClick={() => editTransaction(t.id)}>
+                            <td style={{ padding: '12px 10px' }}>{t.date.substring(5)}</td>
+                            <td style={{ padding: '12px 10px', fontWeight: '500' }}>{t.item}</td>
+                            <td style={{ padding: '12px 10px', textAlign: 'right', fontWeight: '600' }}>{t.amount.toLocaleString()}</td>
+                            <td style={{ padding: '12px 10px', textAlign: 'center', fontSize: '11px', color: isDebit ? '#ef4444' : '#3b82f6' }}>
+                              {flowType}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {getAccountHistory(selectedAccountDetail).length === 0 && (
+                        <tr><td colSpan="4" style={{ textAlign: 'center', color: '#94a3b8', padding: '40px' }}>기록된 거래가 없습니다.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
