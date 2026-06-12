@@ -397,7 +397,7 @@ export default function Home() {
                 {allAccounts.map((acc, index) => <option key={index} value={acc} />)}
               </datalist>
             </div>
-            <div className="panel-card" style={{ flex: 1 }}>
+            <div className="panel-card" style={{ flex: 1, overflow: 'hidden' }}>
               <div className="panel-title">통합 원장 연동 타임라인 데이터</div>
               <div className="table-wrapper">
                 <table>
