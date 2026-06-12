@@ -12,7 +12,7 @@ export default function Home() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   
-  const [view, setView] = useState('dashboard'); // 기본 뷰를 대시보드로 지정
+  const [view, setView] = useState('dashboard');
   const [ledgers, setLedgers] = useState([]);
   const [currentEditId, setCurrentEditId] = useState(null);
   const [selectedAccountDetail, setSelectedAccountDetail] = useState(null);
@@ -219,7 +219,6 @@ export default function Home() {
     reader.readAsArrayBuffer(file);
   };
 
-  // 실시간 잔액 정산 로직
   const accountBalances = {};
   allAccounts.forEach(acc => { accountBalances[acc] = 0; });
   ledgers.forEach(t => {
@@ -235,7 +234,6 @@ export default function Home() {
     }
   });
 
-  // 대시보드 스코프 데이터 계산
   let totalRevenue = 0, totalExpense = 0, totalAsset = accountBalances['주계좌(카뱅)'] || 0, totalLiability = accountBalances['신용카드'] || 0;
   const expBreakdown = {}; const revBreakdown = {};
   ledgers.forEach(t => {
@@ -275,7 +273,6 @@ export default function Home() {
 
   return (
     <div id="appContainer">
-      {/* 레프트 뱅킹 네비게이션 */}
       <nav className="sidebar">
         <div style={{ padding: '10px 16px 20px 16px', fontSize: '18px', fontWeight: '700', color: '#0d3829' }}>📒 NevCash</div>
         <div className={`sidebar-item ${view === 'dashboard' ? 'active' : ''}`} onClick={() => setView('dashboard')}>📊 홈 대시보드</div>
@@ -285,7 +282,6 @@ export default function Home() {
         <div className={`sidebar-item ${view === 'settings' ? 'active' : ''}`} onClick={() => setView('settings')}>⚙️ 계정과목 관리</div>
       </nav>
 
-      {/* 메인 뷰포트 영역 */}
       <div className="main-content">
         <header>
           <div className="header-title">도담캐시 금융 대시보드</div>
@@ -297,10 +293,8 @@ export default function Home() {
           </div>
         </header>
 
-        {/* --- 홈 대시보드 뷰 (NevBank 인터페이스 완벽 재현) --- */}
         {view === 'dashboard' && (
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflowY: 'auto', paddingRight: '6px' }}>
-            {/* 메인 어카운트 섹션 */}
             <div className="main-account-wrapper">
               <div className="account-card">
                 <div>
@@ -324,7 +318,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* 서브 자산 그리드 */}
             <div className="sub-cards-grid">
               <div className="sub-card"><span className="sub-card-title">💵 미수금(미납 수강료)</span><span className="sub-card-amount" style={{ color: '#df4759' }}>₩ {(accountBalances['미수금'] || 0).toLocaleString()}</span></div>
               <div className="sub-card"><span className="sub-card-title">💳 신용카드 잔대금</span><span className="sub-card-amount">₩ {(accountBalances['신용카드'] || 0).toLocaleString()}</span></div>
@@ -332,9 +325,7 @@ export default function Home() {
               <div className="sub-card"><span className="sub-card-title">📉 6월 총비용 집행원인</span><span className="sub-card-amount">₩ {totalExpense.toLocaleString()}</span></div>
             </div>
 
-            {/* 하단 2분할 레이아웃 스플릿 보드 */}
             <div className="split-content-grid">
-              {/* 왼쪽: 최근 실시간 원장 타임라인 */}
               <div className="panel-card">
                 <div className="panel-title">Latest Transactions <span style={{ fontSize: '12px', fontWeight: '500', color: '#0fa46f', cursor: 'pointer' }} onClick={() => setView('transaction')}>더보기 →</span></div>
                 <div className="table-wrapper">
@@ -356,7 +347,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* 오른쪽: 월별 경비 지출 차트 레이아웃 */}
               <div className="panel-card" style={{ alignItems: 'center', justifyContent: 'center' }}>
                 <div className="panel-title" style={{ width: '100%' }}>All Expenses 구조도</div>
                 <div className="donut-chart-box">
@@ -380,7 +370,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* --- 탭 2: 거래 내역 입력 뷰 --- */}
         {view === 'transaction' && (
           <div className="content-wrapper">
             <div className="input-panel-box">
@@ -426,7 +415,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* --- 탭 3: 손익 통계 보고 뷰 --- */}
         {view === 'income' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: 1, overflowY: 'auto' }}>
             <div className="global-filter-bar">
@@ -479,7 +467,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* --- 탭 4: 자산 부채 실사 뷰 --- */}
         {view === 'balance' && (
           <div style={{ display: 'flex', flexDirection: 'row', gap: '24px', flex: 1, overflow: 'hidden' }}>
             <div style={{ flex: selectedAccountDetail ? 1 : 2, display: 'flex', flexDirection: 'column', gap: '20px', overflowY: 'auto' }}>
@@ -533,7 +520,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* --- 탭 5: 계정과목 관리 뷰 --- */}
         {view === 'settings' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: 1, overflowY: 'auto' }}>
             <div className="sub-cards-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
