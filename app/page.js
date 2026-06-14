@@ -391,7 +391,7 @@ export default function Home() {
               <div className="table-wrapper">
                 <table>
                   <thead>
-                    <tr><th>발생일</th><th>거래 적요</th><th>금액</th><th className="col-debit">왼쪽 주머니</th><th className="col-credit">오른쪽 주머니</th><th>비고</th><th>관리</th></tr>
+                    <tr><th>발생일자</th><th>거래 적요</th><th>금액</th><th className="col-debit">왼쪽 주머니</th><th className="col-credit">오른쪽 주머니</th><th>비고</th><th>관리</th></tr>
                   </thead>
                   <tbody>
                     {[...ledgers].sort((a, b) => new Date(b.date) - new Date(a.date)).map(t => (
@@ -473,7 +473,7 @@ export default function Home() {
               {['asset', 'liability', 'equity'].map(category => (
                 <div key={category} className="panel-card" style={{ overflow: 'visible' }}>
                   <div className="panel-title">
-                    {category === 'asset' ? '🟢 자산 실시간 포지션' : category === 'liability' ? '🔴 부채 실시간 포지션' : '🔵 기초 자본 주머니'}
+                    {category === 'asset' ? '🟢 자산 실시간 포시션' : category === 'liability' ? '🔴 부채 실시간 포지션' : '🔵 기초 자본 주머니'}
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
                     {customAccounts[category].map(accName => {
@@ -526,7 +526,12 @@ export default function Home() {
               {['asset', 'liability', 'equity', 'revenue', 'expense'].map(category => (
                 <div className="panel-card" key={category} style={{ minHeight: '260px' }}>
                   <div className="panel-title">
-                    <span>{category.toUpperCase()} 주머니</span>
+                    <span>
+                      {category === 'asset' ? '자산' : 
+                       category === 'liability' ? '부채' : 
+                       category === 'equity' ? '자본' : 
+                       category === 'revenue' ? '수익' : '비용'} 주머니
+                    </span>
                     <button className="btn-outline" style={{ padding: '4px 10px', fontSize: '11px' }} onClick={() => addAccount(category)}>+ 추가</button>
                   </div>
                   <div className="table-wrapper">
